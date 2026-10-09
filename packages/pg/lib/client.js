@@ -724,11 +724,6 @@ class Client extends EventEmitter {
           ssl: !!this.ssl,
         },
       }
-      const origCb = query.callback
-      const enrichedCb = (err, res) => {
-        if (res) context.result = { rowCount: res.rowCount, command: res.command }
-        return origCb(err, res)
-      }
       queryChannel.traceCallback(
         (tracedCb) => {
           query.callback = tracedCb
@@ -736,7 +731,7 @@ class Client extends EventEmitter {
         0,
         context,
         null,
-        enrichedCb
+        query.callback
       )
     }
 

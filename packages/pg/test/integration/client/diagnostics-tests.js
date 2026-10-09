@@ -39,7 +39,9 @@ test('traces queries against a real server', async function () {
   }
 
   const ok = traced.finished.find((ctx) => ctx.query.text === 'SELECT $1::int AS num')
-  assert.deepEqual(ok.result, { rowCount: 1, command: 'SELECT' })
+  assert.equal(ok.result.command, 'SELECT')
+  assert.equal(ok.result.rowCount, 1)
+  assert.deepEqual(ok.result.rows, [{ num: 1 }])
   assert.equal(ok.client.database, client.database)
 
   assert.equal(traced.errors.length, 1)

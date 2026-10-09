@@ -114,10 +114,13 @@ added as the operation progresses.
     user: 'postgres',
     ssl: false,
   },
-  // added on asyncEnd:
+  // added before asyncStart: the query's Result, the same object your callback
+  // receives (an array of Results for multi-statement queries)
   result: {
-    rowCount: 1,
     command: 'SELECT',
+    rowCount: 1,
+    rows: [{ int4: 1 }],
+    fields: [ /* ... */ ],
   },
 }
 ```
