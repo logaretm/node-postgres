@@ -8,7 +8,8 @@ const hasStableTracingChannel =
   typeof dc.tracingChannel === 'function' && typeof dc.tracingChannel('pg:test:probe').hasSubscribers === 'boolean'
 
 const suite = new helper.Suite()
-const test = (name, cb) => suite.test(name, hasStableTracingChannel ? cb : undefined)
+// the native client does not publish to the tracing channels
+const test = (name, cb) => suite.test(name, hasStableTracingChannel && !helper.args.native ? cb : undefined)
 
 const collectQueries = () => {
   const finished = []
