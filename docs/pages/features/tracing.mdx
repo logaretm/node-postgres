@@ -10,9 +10,10 @@ channels and node-postgres will tell you when things happen.
 
 Tracing is built on
 [`node:diagnostics_channel`](https://nodejs.org/api/diagnostics_channel.html)
-and requires Node.js 20+. On older versions or non-Node runtimes it silently
-no-ops. When nothing is listening the overhead is zero since every emission site
-is guarded by a `hasSubscribers` check.
+and is fully supported on Node.js 20+, where nothing is published when no one is
+listening. Node.js 18 has TracingChannel but can't report whether anyone is
+subscribed, so events are always published there, at a small cost per query.
+On Node.js 16 and non-Node runtimes tracing is a no-op.
 
 ## Quick start
 
@@ -28,14 +29,14 @@ channel.subscribe({
   start(ctx) {
     timings.set(ctx, process.hrtime.bigint())
   },
+  // asyncEnd fires for both successful and failed queries
   asyncEnd(ctx) {
     const elapsed = Number(process.hrtime.bigint() - timings.get(ctx)) / 1e6
-    console.log(`${ctx.query.text} completed in ${elapsed.toFixed(2)}ms`)
+    const outcome = ctx.error ? 'failed' : 'completed'
+    console.log(`${ctx.query.text} ${outcome} in ${elapsed.toFixed(2)}ms`)
     timings.delete(ctx)
   },
-  error(ctx) {
-    timings.delete(ctx)
-  },
+  error() {},
   end() {},
   asyncStart() {},
 })
@@ -51,20 +52,20 @@ channel and node-postgres handles the rest.
 These emit the full lifecycle: `start`, `end`, `asyncStart`, `asyncEnd`, and
 `error`.
 
-| Channel | Fires for |
-| --- | --- |
-| `pg:query` | Each `client.query()` call |
-| `pg:connect` | Each `client.connect()` call |
+| Channel           | Fires for                                                     |
+| ----------------- | ------------------------------------------------------------- |
+| `pg:query`        | Each `client.query()` call                                    |
+| `pg:connect`      | Each `client.connect()` call                                  |
 | `pg:pool:connect` | Each `pool.connect()` call (acquiring a client from the pool) |
 
 ### Plain channels
 
 These publish a single message. Subscribe with `dc.channel(name).subscribe(cb)`.
 
-| Channel | Fires for |
-| --- | --- |
+| Channel           | Fires for                             |
+| ----------------- | ------------------------------------- |
 | `pg:pool:release` | A client is released back to the pool |
-| `pg:pool:remove` | A client is removed from the pool |
+| `pg:pool:remove`  | A client is removed from the pool     |
 
 ### How they fit together
 
@@ -89,7 +90,7 @@ depending on whether the operation completes synchronously or asynchronously:
 - **Synchronous success:** `start` -> `end`
 - **Synchronous failure:** `start` -> `error` -> `end`
 - **Asynchronous success:** `start` -> `end` -> `asyncStart` -> `asyncEnd`
-- **Asynchronous failure:** `start` -> `end` -> `asyncStart` -> `error` -> `asyncEnd`
+- **Asynchronous failure:** `start` -> `end` -> `error` -> `asyncStart` -> `asyncEnd`
 
 In practice queries and connections are always asynchronous, so you'll mostly
 work with `start` and `asyncEnd`. The context object is shared across all
@@ -185,7 +186,7 @@ poolConnect.subscribe({
     console.log('pool checkout:', ctx.pool.idleCount, 'idle,', ctx.pool.waitingCount, 'waiting')
   },
   asyncEnd(ctx) {
-    console.log('checked out a', ctx.client.reused ? 'reused' : 'new', 'client')
+    if (ctx.client) console.log('checked out a', ctx.client.reused ? 'reused' : 'new', 'client')
   },
   error() {},
   end() {},
@@ -209,7 +210,7 @@ channel.subscribe({
     console.log('query started:', ctx.query.text)
   },
   asyncEnd(ctx) {
-    console.log('query completed:', ctx.result.command, ctx.result.rowCount, 'rows')
+    if (ctx.result) console.log('query completed:', ctx.result.command, ctx.result.rowCount, 'rows')
   },
   error(ctx) {
     console.error('query failed:', ctx.error)
@@ -226,3 +227,7 @@ channel.subscribe({
 - The plain channels (`pg:pool:release`, `pg:pool:remove`) are not
   TracingChannels because they represent point-in-time events with no async
   continuation.
+- Queries without a callback or promise, such as `pg-cursor` and
+  `pg-query-stream`, are not traced.
+- The native client (`pg.native`) does not publish to `pg:query` or
+  `pg:connect`. The pool channels still fire when a pool uses native clients.
