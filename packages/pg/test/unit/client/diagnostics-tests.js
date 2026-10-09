@@ -191,13 +191,13 @@ testTracing('query diagnostics channel', function () {
   })
 })
 
-testTracing('connection diagnostics channel', function () {
+testTracing('connect diagnostics channel', function () {
   testTracing('publishes start on connect with callback', function (done) {
     const Connection = require('../../../lib/connection')
     const { Client } = helper
 
     let capturedContext
-    const channel = dc.tracingChannel('pg:connection')
+    const channel = dc.tracingChannel('pg:connect')
 
     const subs = {
       start: (ctx) => {

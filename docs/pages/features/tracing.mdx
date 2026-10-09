@@ -54,7 +54,7 @@ These emit the full lifecycle: `start`, `end`, `asyncStart`, `asyncEnd`, and
 | Channel | Fires for |
 | --- | --- |
 | `pg:query` | Each `client.query()` call |
-| `pg:connection` | Each `client.connect()` call |
+| `pg:connect` | Each `client.connect()` call |
 | `pg:pool:connect` | Each `pool.connect()` call (acquiring a client from the pool) |
 
 ### Plain channels
@@ -72,12 +72,12 @@ A typical pooled request moves through the channels in this order:
 
 ```text
 pg:pool:connect              acquire a client from the pool
- └─ pg:connection            connect (only if the pool creates a new client)
+ └─ pg:connect               connect (only if the pool creates a new client)
 pg:query                     execute the query
 pg:pool:release              release the client back to the pool
 ```
 
-`pg:connection` only fires when the pool has to establish a new connection. For
+`pg:connect` only fires when the pool has to establish a new connection. For
 reused clients it is skipped. `pg:pool:remove` fires separately when a client
 is evicted (e.g. after an error or when `maxUses` is exceeded).
 
@@ -111,7 +111,6 @@ added as the operation progresses.
     host: 'localhost',
     port: 5432,
     user: 'postgres',
-    processID: 123,           // PostgreSQL backend process ID
     ssl: false,
   },
   // added on asyncEnd:
@@ -122,7 +121,7 @@ added as the operation progresses.
 }
 ```
 
-### pg:connection
+### pg:connect
 
 ```js
 {
@@ -186,7 +185,7 @@ poolConnect.subscribe({
     console.log('pool checkout:', ctx.pool.idleCount, 'idle,', ctx.pool.waitingCount, 'waiting')
   },
   asyncEnd(ctx) {
-    console.log('checked out client', ctx.client.processID, '(reused:', ctx.client.reused + ')')
+    console.log('checked out a', ctx.client.reused ? 'reused' : 'new', 'client')
   },
   error() {},
   end() {},
@@ -194,7 +193,7 @@ poolConnect.subscribe({
 })
 
 poolRelease.subscribe((msg) => {
-  console.log('client', msg.client.processID, 'released')
+  console.log('client released', msg.error ? 'with an error' : '')
 })
 ```
 

@@ -3,7 +3,7 @@
 const noopChannel = { hasSubscribers: false }
 
 let queryChannel = noopChannel
-let connectionChannel = noopChannel
+let connectChannel = noopChannel
 
 try {
   let dc
@@ -14,7 +14,7 @@ try {
   }
   if (typeof dc.tracingChannel === 'function') {
     queryChannel = dc.tracingChannel('pg:query')
-    connectionChannel = dc.tracingChannel('pg:connection')
+    connectChannel = dc.tracingChannel('pg:connect')
   }
 } catch (e) {
   // diagnostics_channel not available (non-Node environment)
@@ -28,4 +28,4 @@ function shouldTrace(channel) {
   return channel.hasSubscribers !== false
 }
 
-module.exports = { queryChannel, connectionChannel, shouldTrace }
+module.exports = { queryChannel, connectChannel, shouldTrace }
